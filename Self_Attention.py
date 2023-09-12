@@ -32,6 +32,10 @@ print(trigrams[:3])
 vocab = list(set(test_sentence))
 word_to_ix2 = {word: i for i, word in enumerate(vocab)}
 
+# output size
+# here in  trigrams we have 4 tensors in output hence output size is 4
+OUTPUT_SIZE=4
+
 # Number of Epochs
 EPOCHS = 25
 
@@ -42,7 +46,7 @@ SEQ_SIZE = 4
 EMBEDDING_DIM = 10
 
 # Size of the hidden layer
-HIDDEN_DIM = 258
+HIDDEN_DIM = 256
 
 
 class Attention(nn.Module):
@@ -70,26 +74,26 @@ class Attention(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, vocab_size, embed_size, seq_size, hidden):
+    def __init__(self, vocab_size, embed_size, seq_size, hidden,output_size):
         super().__init__()
         self.embed = nn.Embedding(vocab_size, embed_size)
-        self.attention = Attention(embed_size, hidden) # here we are changing seq2seq to seq2seq+2
-        self.fc1 = nn.Linear(hidden * seq_size, vocab_size)  # converting n rows to 1
+        self.attention = Attention(embed_size, hidden*output_size) # here
+        self.fc1 = nn.Linear(hidden * seq_size, vocab_size)  # here we are changing seq2seq to seq2seq+2
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = self.embed(x)
-        x = self.attention(x).view(2, -1)
+        x = self.attention(x).view(4, -1)
         x = self.fc1(x)
-        print(x.shape)
+        # print('model op shape:',x.shape)
         log_probs = F.log_softmax(x, dim=1)
         return log_probs
 
 
 learning_rate = 0.001
 loss_function = nn.NLLLoss()  # negative log likelihood
-CONTEXT_SIZE=1
-model = Model(len(vocab), EMBEDDING_DIM, CONTEXT_SIZE, HIDDEN_DIM)
+CONTEXT_SIZE=2
+model = Model(len(vocab), EMBEDDING_DIM, CONTEXT_SIZE, HIDDEN_DIM,OUTPUT_SIZE)
 model.to('cuda')
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
@@ -107,7 +111,7 @@ for i in range(EPOCHS):
 
         # step 3: Forward propogation for calculating log probs
         log_probs = model(context_idxs)
-
+        # print('Output shape:',log_probs.shape)
         # step 4: calculating loss
         target=torch.tensor([word_to_ix2[w] for w in target])
         target=target.to('cuda')
@@ -138,9 +142,8 @@ with torch.no_grad():
     target_idxs=target_idxs.to('cuda')
     print("Input : ", context_idxs.to('cpu').detach().tolist(),'Expected Prediction:' ,target_idxs.to('cpu').detach().tolist())
     log_preds = model(context_idxs)
-    print(torch.argmax(log_preds,dim=1))
     prediction=torch.argmax(log_preds,dim=1).cpu().detach()
     print('RAW Prediction:', prediction)
     # print("Predicted indices: ", torch.argmax(log_preds),vocab[torch.argmax(log_preds[0]).cpu().detach()])
-    print('This is how it looks like:\n',vocab[context_idxs[0]],vocab[context_idxs[1]],' ',vocab[prediction[0]],vocab[prediction[1]])
+    print('This is how it looks like:\n',vocab[context_idxs[0]],vocab[context_idxs[1]],vocab[prediction[0]],vocab[prediction[1]],vocab[prediction[2]],vocab[prediction[3]])
 
