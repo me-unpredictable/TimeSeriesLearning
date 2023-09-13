@@ -28,11 +28,11 @@ test_sentence = """The sayings of King Lemuel—an inspired utterance his mother
     but a woman who fears the Lord is to be praised. Honor her for all that her hands have done, and let her works bring her praise at the city gate.""".lower().split()
 
 # Build a list of tuples.  Each tuple is ([ word_i-2, word_i-1 ], target word)
-trigrams = [([test_sentence[i], test_sentence[i + 1]], [test_sentence[i + 2],test_sentence[i + 3],test_sentence[i + 4],test_sentence[i + 5]])
+prediction_set = [([test_sentence[i], test_sentence[i + 1]], [test_sentence[i + 2],test_sentence[i + 3],test_sentence[i + 4],test_sentence[i + 5]])
             for i in range(len(test_sentence) - 5)]
 
 # print the first 3, just so you can see what they look like
-# print(trigrams[:3])
+# print(prediction_set[:3])
 
 vocab = list(set(test_sentence))
 print(vocab)
@@ -40,8 +40,10 @@ print(vocab)
 # i.e. 'who':0,'hello':1
 # this helps to find location of word in vocab
 # these values will be used to predict
-word_to_ix2 = {word: i for i, word in enumerate(vocab)}
+key_value_map = {word: i for i, word in enumerate(vocab)}
 
+# ------------------------------------------------------------------------------
+# Model parameters
 # output size
 # here in  trigrams we have 4 tensors in output hence output size is 4
 OUTPUT_SIZE=4
@@ -61,19 +63,24 @@ HIDDEN_DIM = 256
 learning_rate = 0.001
 loss_function = nn.NLLLoss()  # negative log likelihood
 CONTEXT_SIZE=2
+# -----------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------
+# Model initialization
 model = Model(len(vocab), EMBEDDING_DIM, CONTEXT_SIZE, HIDDEN_DIM,OUTPUT_SIZE)
 model.to('cuda')
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+# -----------------------------------------------------------------------------------
 
-# Training
+#------------------------------------------------------------------------------------
+# Model training
 loss_=[]
 for i in range(EPOCHS):
     total_loss = []
-    for context, target in trigrams:
+    for context, target in prediction_set:
         # context, target = ['thomas', 'edison.'] the
-
         # step 1: context id generation
-        context_idxs = torch.tensor([word_to_ix2[w] for w in context], dtype=torch.long)
+        context_idxs = torch.tensor([key_value_map[w] for w in context], dtype=torch.long)
         context_idxs=context_idxs.to('cuda')
         # step 2: setting zero gradient for models
         model.zero_grad()
@@ -82,7 +89,7 @@ for i in range(EPOCHS):
         log_probs = model(context_idxs)
         # print('Output shape:',log_probs.shape)
         # step 4: calculating loss
-        target=torch.tensor([word_to_ix2[w] for w in target])
+        target=torch.tensor([key_value_map[w] for w in target])
         target=target.to('cuda')
         loss = loss_function(log_probs,target)
 
@@ -97,6 +104,10 @@ for i in range(EPOCHS):
     print('\r',end=' ')
     print("Epoch: ", str(i), " Loss: ", str(total_loss),end=' ')
     loss_.append(total_loss)
+# -------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# Loss plot
 plt.plot(loss_)
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
@@ -104,18 +115,21 @@ plt.title('Epoch vs Loss')
 plt.legend(['Loss'])
 plt.grid()
 plt.show()
-# Prediction
+# --------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# Model inference
 with torch.no_grad():
     # Fetching a random context and target
-    rand_val = trigrams[random.randrange(len(trigrams))]
+    rand_val = prediction_set[random.randrange(len(prediction_set))]
     print(rand_val)
     context = rand_val[0]
     target = rand_val[1]
 
     # Getting context and target index's
-    context_idxs = torch.tensor([word_to_ix2[w] for w in context], dtype=torch.long)
+    context_idxs = torch.tensor([key_value_map[w] for w in context], dtype=torch.long)
     context_idxs=context_idxs.to('cuda')
-    target_idxs = torch.tensor([word_to_ix2[w] for w in target], dtype=torch.long)
+    target_idxs = torch.tensor([key_value_map[w] for w in target], dtype=torch.long)
     target_idxs=target_idxs.to('cuda')
     print("Input : ", context_idxs.to('cpu').detach().tolist(),'Expected Prediction:' ,target_idxs.to('cpu').detach().tolist())
     log_preds = model(context_idxs)
@@ -123,4 +137,4 @@ with torch.no_grad():
     print('RAW Prediction:', prediction)
     # print("Predicted indices: ", torch.argmax(log_preds),vocab[torch.argmax(log_preds[0]).cpu().detach()])
     print('This is how it looks like:\n',vocab[context_idxs[0]],vocab[context_idxs[1]],vocab[prediction[0]],vocab[prediction[1]],vocab[prediction[2]],vocab[prediction[3]])
-
+# --------------------------------------------------------------------------------
