@@ -4,13 +4,12 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-
-random.seed(0)
-torch.manual_seed(0)
+from self_attntion_model import Model
+# random.seed(0)
+# torch.manual_seed(0)
 
 # Sample text for Training
 test_sentence = """The sayings of King Lemuel—an inspired utterance his mother taught him. Listen, my son! Listen, son of my womb! Listen, my son, the answer to my prayers! Do not spend your strength[a] on women, your vigor on those who ruin kings. It is not for kings, Lemuel—
@@ -36,6 +35,11 @@ trigrams = [([test_sentence[i], test_sentence[i + 1]], [test_sentence[i + 2],tes
 # print(trigrams[:3])
 
 vocab = list(set(test_sentence))
+print(vocab)
+# here we create key using words, their location/indexes are their value
+# i.e. 'who':0,'hello':1
+# this helps to find location of word in vocab
+# these values will be used to predict
 word_to_ix2 = {word: i for i, word in enumerate(vocab)}
 
 # output size
@@ -53,48 +57,6 @@ EMBEDDING_DIM = 10
 
 # Size of the hidden layer
 HIDDEN_DIM = 256
-
-
-class Attention(nn.Module):
-    """
-    A custom self attention layer
-    """
-
-    def __init__(self, in_feat, out_feat):
-        super().__init__()
-        self.Q = nn.Linear(in_feat, out_feat)  # Query
-        self.K = nn.Linear(in_feat, out_feat)  # Key
-        self.V = nn.Linear(in_feat, out_feat)  # Value
-        self.softmax = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        # print('in attention:',x.shape)
-        Q = self.Q(x)
-        K = self.K(x)
-        V = self.V(x)
-        d = K.shape[0]  # dimension of key vector
-        QK_d = (Q @ K.T) / (d) ** 0.5
-        prob = self.softmax(QK_d)
-        attention = prob @ V
-        return attention
-
-
-class Model(nn.Module):
-    def __init__(self, vocab_size, embed_size, seq_size, hidden,output_size):
-        super().__init__()
-        self.embed = nn.Embedding(vocab_size, embed_size)
-        self.attention = Attention(embed_size, hidden*output_size) # here
-        self.fc1 = nn.Linear(hidden * seq_size, vocab_size)  # here we are changing seq2seq to seq2seq+2
-        self.softmax = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        x = self.embed(x)
-        x = self.attention(x).view(4, -1)
-        x = self.fc1(x)
-        # print('model op shape:',x.shape)
-        log_probs = F.log_softmax(x, dim=1)
-        return log_probs
-
 
 learning_rate = 0.001
 loss_function = nn.NLLLoss()  # negative log likelihood
